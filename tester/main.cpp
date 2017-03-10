@@ -74,8 +74,8 @@ int main(int argc, char const *argv[]) {
 		std::make_pair("mini", dataSize_mini),
 		std::make_pair("small", dataSize_small),
 		std::make_pair("medium", dataSize_medium),
-		// std::make_pair("large", dataSize_large),
-		// std::make_pair("xlarge", dataSize_xlarge),
+		std::make_pair("large", dataSize_large),
+		std::make_pair("xlarge", dataSize_xlarge),
 	};
 
 	// create a compiler
