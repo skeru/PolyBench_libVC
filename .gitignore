@@ -1,4 +1,5 @@
 libVersioningCompiler/build/
 libVersioningCompiler/config/FindLibVersioningCompiler.cmake
+cmake/FindLibVersioningCompiler.cmake
 
 build/
