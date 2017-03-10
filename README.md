@@ -1,4 +1,4 @@
-= full PolyBench suite run using LibVersioningCompiler =
+# full PolyBench suite run using LibVersioningCompiler
 
 This is a demonstration of how `LibVersioningCompiler` can be used to run multiple benchmarks within the same C++ application.
 
