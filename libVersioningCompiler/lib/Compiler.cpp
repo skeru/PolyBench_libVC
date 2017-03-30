@@ -20,6 +20,7 @@
  */
 #include "versioningCompiler/Compiler.hpp"
 #include <cstdio>
+#include <dlfcn.h> // needed for loadSymbol
 #include <fstream>
 #include <sys/stat.h>
 
@@ -39,7 +40,10 @@ Compiler::Compiler(const std::string &compilerID,
                                     logFile(log),
                                     libWorkingDirectory(libWorkingDir),
                                     installDirectory(installDir),
-                                    hasSupportIR(supportIR) { }
+                                    hasSupportIR(supportIR)
+{
+  addReferenceToLogFile(logFile);
+}
 
 // ----------------------------------------------------------------------------
 // ------------------------- get compiler identifier --------------------------
@@ -68,6 +72,7 @@ void Compiler::log_exec(const std::string &command) const
   char buf[256];
   if (logFile != "") {
     _command = _command + " 2>&1";
+    lockMutex(logFile);
     logstream.open(logFile, std::ofstream::app);
     logstream << _command << std::endl;
   }
@@ -78,6 +83,7 @@ void Compiler::log_exec(const std::string &command) const
     }
     logstream << std::endl;
     logstream.close();
+    unlockMutex(logFile);
   }
   pclose(output);
   return;
@@ -90,11 +96,59 @@ void Compiler::log_string(const std::string &command) const
 {
   std::ofstream logstream;
   if (logFile != "") {
+    lockMutex(logFile);
     logstream.open(logFile, std::ofstream::app);
     logstream << command << std::endl;
     logstream.close();
+    unlockMutex(logFile);
   }
   return;
+}
+
+// ---------------------------------------------------------------------------
+// ------------------------------- loadSymbol --------------------------------
+// ---------------------------------------------------------------------------
+void Compiler::releaseSymbol(void ** handler, void ** symbol) const
+{
+  if (dlclose(*handler)) {
+    char* error = dlerror();
+    std::string error_str(error);
+    log_string(error_str);
+  }
+  *handler = nullptr;
+  *symbol = nullptr;
+  return;
+}
+
+// ---------------------------------------------------------------------------
+// ------------------------------- loadSymbol --------------------------------
+// ---------------------------------------------------------------------------
+void* Compiler::loadSymbol(const std::string &bin,
+                           const std::string &func,
+                           void ** handler) const
+{
+  void *symbol = nullptr;
+  if (exists(bin)) {
+    *handler = dlopen(bin.c_str(), RTLD_NOW);
+  } else {
+    std::string error_str = "cannot load symbol from " + bin +
+                            " : file not found";
+    log_string(error_str);
+    return symbol;
+  }
+  if (*handler) {
+    symbol = dlsym(*handler, func.c_str());
+    if (!symbol) {
+      std::string error_str = "cannot load symbol from " + bin +
+                              " : symbol not found";
+      log_string(error_str);
+    }
+  } else {
+    char* error = dlerror();
+    std::string error_str(error);
+    log_string(error_str);
+  }
+  return symbol;
 }
 
 // ----------------------------------------------------------------------------
@@ -153,5 +207,88 @@ void Compiler::unsupported(const std::string &message) const
   const std::string error_string = "Required Compiler unsupported feature:\n\t"
                                    + message;
   log_string(error_string);
+  return;
+}
+
+// ----------------------------------------------------------------------------
+// --------------------- static mutex map initialization ----------------------
+// ----------------------------------------------------------------------------
+std::map<std::string, std::pair<uint64_t, std::shared_ptr<std::mutex>>>
+Compiler::log_access_mtx_map;
+
+// ----------------------------------------------------------------------------
+// ------------ static initialization of mutex to access mutex map ------------
+// ----------------------------------------------------------------------------
+std::mutex Compiler::mtx_map_mtx;
+
+// ----------------------------------------------------------------------------
+// ---------------- static mutex map accessors : add reference ----------------
+// ----------------------------------------------------------------------------
+void Compiler::addReferenceToLogFile(const std::string &logFileName)
+{
+  if (logFileName == "") {
+    return;
+  }
+  mtx_map_mtx.lock();
+  auto it = log_access_mtx_map.find(logFileName);
+  if (it != log_access_mtx_map.end()) {
+    it->second.first ++;
+  } else {
+    log_access_mtx_map[logFileName] =
+      std::make_pair<uint64_t, std::shared_ptr<std::mutex>>(
+        1,
+        std::make_shared<std::mutex>());
+  }
+  mtx_map_mtx.unlock();
+  return;
+}
+
+// ----------------------------------------------------------------------------
+// -------------- static mutex map accessors : remove reference ---------------
+// ----------------------------------------------------------------------------
+void Compiler::removeReferenceToLogFile(const std::string &logFileName)
+{
+  if (logFileName == "") {
+    return;
+  }
+  mtx_map_mtx.lock();
+  auto it = log_access_mtx_map.find(logFileName);
+  if (it != log_access_mtx_map.end()) {
+    it->second.first --;
+    if(it->second.first <= 0) {
+      log_access_mtx_map.erase(it);
+    }
+  }
+  mtx_map_mtx.unlock();
+  return;
+}
+
+// ----------------------------------------------------------------------------
+// ----------------- static mutex map accessors : lock mutex ------------------
+// ----------------------------------------------------------------------------
+void Compiler::lockMutex(const std::string &logFileName)
+{
+  if (logFileName == "") {
+    return;
+  }
+  auto it = log_access_mtx_map.find(logFileName);
+  if (it != log_access_mtx_map.end()) {
+    it->second.second->lock();
+  }
+  return;
+}
+
+// ----------------------------------------------------------------------------
+// ---------------- static mutex map accessors : unlock mutex -----------------
+// ----------------------------------------------------------------------------
+void Compiler::unlockMutex(const std::string &logFileName)
+{
+  if (logFileName == "") {
+    return;
+  }
+  auto it = log_access_mtx_map.find(logFileName);
+  if (it != log_access_mtx_map.end()) {
+    it->second.second->unlock();
+  }
   return;
 }

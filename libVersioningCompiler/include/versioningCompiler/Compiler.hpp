@@ -22,8 +22,11 @@
 #define LIB_VERSIONING_COMPILER_COMPILER_HPP
 
 #include "versioningCompiler/Option.hpp"
-#include <string>
 #include <list>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <string>
 
 namespace vc {
 
@@ -44,7 +47,10 @@ class Compiler
            bool supportIR = false);
 
 /** \brief Default destructor. */
-  inline virtual ~Compiler() {}
+  inline virtual ~Compiler()
+  {
+    removeReferenceToLogFile(logFile);
+  }
 
 /** \brief Returns the compiler unique identifier. */
   std::string getId() const;
@@ -92,16 +98,23 @@ class Compiler
                                   const std::string &versionID,
                                   const std::list<Option> options) const = 0;
 
-/** \brief Opens the binary shared object and loads the symbol relative to the
- * given function.
+/** \brief Opens the binary shared object, stores in *handler the reference to
+ * the open shared object, and loads the symbol relative to the given function.
  *
  * Returns the loaded function pointer on success. nullptr otherwise.
  * Output of this method is supposed to reinterpreted by the caller.
- *
- * Implementation specific.
  */
-  virtual void *loadSymbol(const std::string &bin,
-                           const std::string &func) const = 0;
+  void *loadSymbol(const std::string &bin,
+                   const std::string &func,
+                   void ** handler) const;
+
+/** \brief Closes the binary shared object, set *handler to nullptr, and
+ * invalidates the symbol relative to the given function.
+ *
+ * Returns the loaded function pointer on success. nullptr otherwise.
+ * Output of this method is supposed to reinterpreted by the caller.
+ */
+  void releaseSymbol(void ** handler, void ** symbol) const;
 
 /** \brief Converts an Option object into a compiler flag.
  *
@@ -150,6 +163,14 @@ class Compiler
    */
   std::string getSharedObjectFileName(const std::string &versionID) const;
 
+  /** \brief Acquire the lock of the mutex related to logfileName. Blocking.
+   */
+  static void lockMutex(const std::string &logFileName);
+
+  /** \brief Release the lock of the mutex related to logfileName.
+   */
+  static void unlockMutex(const std::string &logFileName);
+
   /** \brief default method to notify that the given implementation of the
    * Compiler class does not support a specific feature.
    *
@@ -164,6 +185,25 @@ class Compiler
    */
   std::string id;
 
+  /** Mutex to regulate exclusive access to log file.
+   * It also includes a reference counter.
+   */
+  static
+  std::map<std::string, std::pair<uint64_t, std::shared_ptr<std::mutex>>>
+  log_access_mtx_map;
+
+  /** \brief Mutex to modify reference counters on the mutex map. */
+  static std::mutex mtx_map_mtx;
+
+  /** \brief Increments the reference counter of the mutex related to
+   * logFileName. If needed, it adds a new entry.
+   */
+  static void addReferenceToLogFile(const std::string &logFileName);
+
+  /** \brief Decrements the reference counter of the mutex related to
+   * logFileName. If needed, it removes an entry.
+   */
+  static void removeReferenceToLogFile(const std::string &logFileName);
 };
 
 } // end namespace vc

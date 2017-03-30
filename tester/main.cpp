@@ -340,6 +340,7 @@ int main(int argc, char const *argv[]) {
 		if (run) {
 			run(0, runningArgv);
 		}
+		j.second->fold();
 	}
 
 	return 0;

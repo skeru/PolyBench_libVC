@@ -34,7 +34,6 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Target/TargetMachine.h"
 
-#include <mutex>
 #include <string>
 #include <vector>
 
@@ -72,9 +71,6 @@ public:
                                   const std::list<Option> options) const
   override;
 
-  virtual void *loadSymbol(const std::string &bin,
-                           const std::string &func) const override;
-
   virtual std::string getOptionString(const Option &o) const override;
 
 private:
@@ -91,7 +87,7 @@ private:
 /** \brief mutex to regulate exclusive access to static command line options
  * during optimizer option parsing and processing.
  */
-  static std::mutex mtx;
+  static std::mutex opt_parse_mtx;
 
 };
 } /* end namespace vc */
