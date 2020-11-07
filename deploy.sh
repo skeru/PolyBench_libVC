@@ -1,5 +1,6 @@
 #!/bin/bash
 
+git submodule update --init
 rm -rf libVersioningCompiler/build
 mkdir libVersioningCompiler/build
 cd libVersioningCompiler/build

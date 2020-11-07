@@ -1,0 +1,4 @@
+[submodule "libVersioningCompiler"]
+	path = libVersioningCompiler
+	url = git@github.com:skeru/libVersioningCompiler.git
+	branch = master
