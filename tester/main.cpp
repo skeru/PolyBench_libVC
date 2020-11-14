@@ -35,47 +35,49 @@ typedef struct cat_t {
 
 int main(int argc, char const *argv[]) {
 	// common options
-	vc::Option includeCustomUtils("custom_include", "-include", "utils.hpp");
-	vc::Option includeCustomUtilsDir("custom_includeDir", "-I", "../include");
-	vc::Option includePolybenchUtils("polybench_include", "-include", "polybench.c");
-	vc::Option includePolybenchUtilsDir("pb_Dir", "-I", polybench_source + "/utilities");
-	vc::Option optimizationLevel("O","-O","3");
-	vc::Option standardCxx("std","-std=","c++11");
-	std::list<vc::Option> default_options = {
-		standardCxx,
-		includePolybenchUtils,
-		includeCustomUtils,
-		optimizationLevel,
-		includePolybenchUtilsDir,
-		includeCustomUtilsDir,
+	const vc::opt_list_t default_options {
+                vc::make_option("-includeutils.hpp"),
+                vc::make_option("-O0"),
+                vc::make_option("-I" + polybench_source + "/utilities"),
+                vc::make_option("-I../include"),
 	};
 
 	// data type options
-	vc::Option dataType_int("dataType", "-DDATA_TYPE_IS_INT");
-	vc::Option dataType_float("dataType", "-DDATA_TYPE_IS_FLOAT");
-	vc::Option dataType_double("dataType", "-DDATA_TYPE_IS_DOUBLE");
+	const vc::opt_list_t data_type_opt = {
+		vc::make_option("-DDATA_TYPE_IS_INT"),
+		vc::make_option("-DDATA_TYPE_IS_FLOAT"),
+		vc::make_option("-DDATA_TYPE_IS_DOUBLE"),
+	};
+
+	auto it = data_type_opt.begin();
+
 	std::list<list_element_t> dataType_list_ifd = {
-		std::make_pair("int", dataType_int),
-		std::make_pair("float", dataType_float),
-		std::make_pair("double", dataType_double),
+		std::make_pair("int", *it),
+		std::make_pair("float", *(std::next(it, 1))),
+		std::make_pair("double", *(std::next(it, 2))),
 	};
 	std::list<list_element_t> dataType_list_fd = {
-		std::make_pair("float", dataType_float),
-		std::make_pair("double", dataType_double),
+		std::make_pair("float", *(std::next(it, 1))),
+		std::make_pair("double", *(std::next(it, 2))),
 	};
 
 	// data size options
-	vc::Option dataSize_mini("dataType", "-DMINI_DATASET");
-	vc::Option dataSize_small("dataType", "-DSMALL_DATASET");
-	vc::Option dataSize_medium("dataType", "-DMEDIUM_DATASET");
-	vc::Option dataSize_large("dataType", "-DLARGE_DATASET");
-	vc::Option dataSize_xlarge("dataType", "-DEXTRALARGE_DATASET");
+	const vc::opt_list_t data_size = {
+		vc::make_option("-DMINI_DATASET"),
+		vc::make_option("-DSMALL_DATASET"),
+		vc::make_option("-DMEDIUM_DATASET"),
+		vc::make_option("-DLARGE_DATASET"),
+		vc::make_option("-DEXTRALARGE_DATASET"),
+	};
+
+	it = data_size.begin();
+
 	std::list<list_element_t> size_list = {
-		std::make_pair("mini", dataSize_mini),
-		std::make_pair("small", dataSize_small),
-		std::make_pair("medium", dataSize_medium),
-		std::make_pair("large", dataSize_large),
-		std::make_pair("xlarge", dataSize_xlarge),
+		std::make_pair("mini", *it),
+		std::make_pair("small", *(std::next(it, 1))),
+		std::make_pair("medium", *(std::next(it, 2))),
+		std::make_pair("large", *(std::next(it, 3))),
+		std::make_pair("xlarge", *(std::next(it, 4))),
 	};
 
 	// create a compiler
@@ -263,7 +265,7 @@ int main(int argc, char const *argv[]) {
 	k_tmp.kernel_label = "adi";
 	k_tmp.kernel_folder = "adi";
 	k_tmp.fileName = "adi.c";
-	k_tmp.data_type_option_list = dataType_list_ifd;
+	k_tmp.data_type_option_list = dataType_list_fd;
 	category.kernel_config_list.push_back(k_tmp);
 
 	k_tmp.kernel_label = "fdtd-2d";
@@ -306,6 +308,7 @@ int main(int argc, char const *argv[]) {
 		for (const auto &cat : configList) {
 			for (const auto &k : cat.kernel_config_list) {
 				for (const auto &datatype : k.data_type_option_list) {
+					builder.reset();
 					const std::string label = cat.category_label + " " +
 					                          k.kernel_label + " - " +
 					                          size.first + " - " +
@@ -314,13 +317,16 @@ int main(int argc, char const *argv[]) {
 					const std::string kernelSourceDir = polybench_source + "/" +
 					                                    cat.category_folder + "/" +
 					                                    k.kernel_folder;
-					vc::Option sourceDir("sourceDir", "-I", kernelSourceDir);
-					builder._optionList = {size.second, datatype.second, sourceDir};
-					builder._optionList.insert( builder._optionList.end(),
-					                            default_options.begin(),
-					                            default_options.end());
-					builder._fileName_src = kernelSourceDir + "/" + k.fileName;
-					builder._functionName = k.function_name;
+					builder.addIncludeDir(kernelSourceDir);
+					vc::opt_list_t options = {
+						size.second,
+						datatype.second,
+					};
+					options.insert(options.end(), default_options.begin(), default_options.end());
+					builder.options(options);
+					builder.addSourceFile(kernelSourceDir + "/" + k.fileName);
+					builder.addSourceFile(polybench_source + "/utilities/polybench.c");
+					builder._functionName = {k.function_name};
 					jobList.push_back(std::make_pair(label, builder.build()));
 				}
 			}

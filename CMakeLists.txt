@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 3.1.2)
 
 set (EXE_NAME "runPolyBenchSuite")
 
@@ -13,9 +13,11 @@ set (DEPS_LIBS ${DEPS_LIBS} ${LIBVC_LIBRARIES})
 set (CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE})
 set (CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-std=c++11")
 
-if (HAVE_CLANG_LIB)
-	set (CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-DHAVE_CLANG_LIB")
-endif(HAVE_CLANG_LIB)
+if (HAVE_CLANG_LIB_COMPILER)
+        include_directories(${LIBCLANG_INCLUDES})
+        link_directories(${LIBCLANG_LIBRARY_DIR})
+        add_compile_definitions(HAVE_CLANG_LIB)
+endif(HAVE_CLANG_LIB_COMPILER)
 
 set (source_files
 	"tester/main.cpp"
